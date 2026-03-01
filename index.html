@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Roblox Downfall Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg-dark: #020617;
+      --bg-panel: rgba(15, 23, 42, 0.85);
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.2);
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --danger: #f97373;
+      --border-subtle: rgba(148, 163, 184, 0.25);
+      --shadow-strong: 0 24px 60px rgba(15, 23, 42, 0.9);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-pill: 999px;
+      --blur-bg: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    body {
+      position: relative;
+    }
+
+    /* Background image + dark blur overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: url("background.png") center/cover no-repeat fixed;
+      filter: blur(12px) brightness(0.25);
+      transform: scale(1.05);
+      z-index: -2;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 55%),
+                  radial-gradient(circle at bottom, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 1));
+      mix-blend-mode: screen;
+      opacity: 0.9;
+      z-index: -1;
+    }
+
+    .scanline-overlay {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(
+        to bottom,
+        rgba(15, 23, 42, 0.35) 1px,
+        transparent 1px
+      );
+      background-size: 100% 2px;
+      opacity: 0.35;
+      mix-blend-mode: soft-light;
+      z-index: 0;
+    }
+
+    .grain-overlay {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='noStitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+      opacity: 0.45;
+      z-index: 0;
+    }
+
+    .root {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      padding: 32px clamp(24px, 4vw, 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .top-row {
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.4fr);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      .top-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-strong);
+      backdrop-filter: blur(var(--blur-bg));
+      padding: 18px 20px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 55%);
+      opacity: 0.7;
+      mix-blend-mode: soft-light;
+      pointer-events: none;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel-title {
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-title-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.9);
+    }
+
+    .panel-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      opacity: 0.85;
+    }
+
+    .metric-main {
+      position: relative;
+      z-index: 1;
+      margin-top: 6px;
+      margin-bottom: 10px;
+    }
+
+    .metric-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: clamp(1.9rem, 3vw, 2.4rem);
+      font-weight: 600;
+      color: var(--accent);
+      text-shadow: 0 0 18px rgba(56, 189, 248, 0.7);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .metric-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .pill {
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      padding: 4px 10px;
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.7));
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .pill-danger {
+      border-color: rgba(248, 113, 113, 0.6);
+      color: #fecaca;
+    }
+
+    .pill-danger .pill-dot {
+      background: var(--danger);
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.9);
+    }
+
+    .metric-footer {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      opacity: 0.9;
+    }
+
+    .metric-footer span {
+      color: var(--accent);
+    }
+
+    .trends-list,
+    .games-list {
+      position: relative;
+      z-index: 1;
+      margin-top: 6px;
+      max-height: 260px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 4px;
+    }
+
+    .scroll-fade {
+      position: absolute;
+      inset-inline: 0;
+      bottom: 0;
+      height: 40px;
+      background: linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.95));
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .trend-item,
+    .game-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.85));
+      border: 1px solid rgba(30, 64, 175, 0.7);
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.8);
+      font-size: 0.8rem;
+    }
+
+    .trend-left,
+    .game-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .trend-tag {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: var(--radius-pill);
+      padding: 2px 8px;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      white-space: nowrap;
+    }
+
+    .trend-label,
+    .game-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-main);
+    }
+
+    .trend-meta,
+    .game-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .game-rank {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      opacity: 0.9;
+    }
+
+    .game-ccu {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.78rem;
+    }
+
+    .game-genre {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .center-cta-wrapper {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .center-cta {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 26px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(56, 189, 248, 0.7);
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.9));
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.95), 0 0 40px rgba(56, 189, 248, 0.4);
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .center-cta::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        120deg,
+        rgba(56, 189, 248, 0.35),
+        transparent 40%,
+        transparent 60%,
+        rgba(56, 189, 248, 0.35)
+      );
+      opacity: 0;
+      transform: translateX(-40%);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      mix-blend-mode: screen;
+    }
+
+    .center-cta:hover::before {
+      opacity: 1;
+      transform: translateX(40%);
+    }
+
+    .center-cta-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.4), rgba(15, 23, 42, 1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid rgba(56, 189, 248, 0.7);
+    }
+
+    .center-cta-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .center-cta-text {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+
+    .center-cta-main {
+      font-size: 0.9rem;
+    }
+
+    .center-cta-sub {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: none;
+      letter-spacing: 0.08em;
+    }
+
+    .bottom-bar {
+      position: fixed;
+      inset-inline: 0;
+      bottom: 0;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .bottom-left,
+    .bottom-right {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .clock-pill {
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.9));
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.9);
+    }
+
+    .clock-time {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: var(--text-main);
+      font-size: 0.85rem;
+    }
+
+    .clock-date {
+      font-size: 0.75rem;
+    }
+
+    .follow-btn {
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(56, 189, 248, 0.7);
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.9));
+      padding: 7px 16px;
+      font-size: 0.8rem;
+      color: var(--accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.95);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .follow-btn span {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: none;
+      letter-spacing: 0.05em;
+    }
+
+    .follow-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+    }
+
+    /* Cursor trail */
+    .cursor-dot {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(56, 189, 248, 1), rgba(56, 189, 248, 0));
+      mix-blend-mode: screen;
+      opacity: 0.9;
+      transform: translate(-50%, -50%);
+      animation: trailFade 0.6s ease-out forwards;
+      z-index: 9999;
+    }
+
+    @keyframes trailFade {
+      0% {
+        opacity: 0.9;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2);
+      }
+    }
+
+    /* Scrollbars (for desktop) */
+    .trends-list::-webkit-scrollbar,
+    .games-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .trends-list::-webkit-scrollbar-track,
+    .games-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .trends-list::-webkit-scrollbar-thumb,
+    .games-list::-webkit-scrollbar-thumb {
+      background: rgba(30, 64, 175, 0.8);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanline-overlay"></div>
+  <div class="grain-overlay"></div>
+
+  <div class="root">
+    <div class="top-row">
+      <!-- Global Roblox stats -->
+      <section class="panel" aria-label="Roblox global stats">
+        <header class="panel-header">
+          <div class="panel-title">
+            <span class="panel-title-dot"></span>
+            PROTEST · ROBLOX BLACKOUT TELEMETRY
+          </div>
+          <div class="panel-subtitle" id="last-updated">
+            Waiting for RoMonitor…
+          </div>
+        </header>
+
+        <div class="metric-main">
+          <div class="metric-label">Global concurrent users (live)</div>
+          <div class="metric-value" id="global-ccu">
+            0
+          </div>
+
+          <div class="metric-meta">
+            <div class="pill">
+              <span class="pill-dot"></span>
+              <span id="ccu-change">Δ 0 since last poll</span>
+            </div>
+            <div class="pill pill-danger">
+              <span class="pill-dot"></span>
+              <span id="ccu-trend-label">Downfall tracking armed</span>
+            </div>
+          </div>
+
+          <div class="metric-footer">
+            Tracking full, non‑abbreviated counts from <span>RoMonitor</span> as they update.
+          </div>
+        </div>
+
+        <div class="metric-main">
+          <div class="metric-label">Active platform trends</div>
+          <div class="trends-list" id="trends-list">
+            <!-- Filled by JS -->
+          </div>
+          <div class="scroll-fade"></div>
+        </div>
+      </section>
+
+      <!-- Top 50 games -->
+      <section class="panel" aria-label="Top 50 Roblox games">
+        <header class="panel-header">
+          <div class="panel-title">
+            <span class="panel-title-dot"></span>
+            TOP 50 EXPERIENCES · LIVE
+          </div>
+          <div class="panel-subtitle">
+            Data mirrored from RoMonitor / Roblox telemetry
+          </div>
+        </header>
+
+        <div class="games-list" id="games-list">
+          <!-- Filled by JS -->
+        </div>
+        <div class="scroll-fade"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Center CTA -->
+  <div class="center-cta-wrapper">
+    <a
+      href="https://polytoria.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="center-cta"
+    >
+      <div class="center-cta-logo">
+        <img src="pt.png" alt="Polytoria logo" />
+      </div>
+      <div class="center-cta-text">
+        <div class="center-cta-main">Play Polytoria!</div>
+        <div class="center-cta-sub">Leave the blackout. Build somewhere that listens.</div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar">
+    <div class="bottom-left">
+      <div class="clock-pill">
+        <span>LOCAL TIME</span>
+        <span class="clock-time" id="clock-time">--:--:--</span>
+        <span class="clock-date" id="clock-date">Loading…</span>
+      </div>
+    </div>
+
+    <div class="bottom-right">
+      <a
+        href="https://polytoria.com/u/average/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="follow-btn"
+      >
+        <div class="follow-icon">+</div>
+        FOLLOW <strong>AVERAGE</strong>
+        <span>polytoria.com/u/average/</span>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // ===== Cursor trail =====
+    (function () {
+      let lastTime = 0;
+      const throttleMs = 12;
+
+      window.addEventListener("mousemove", (e) => {
+        const now = performance.now();
+        if (now - lastTime < throttleMs) return;
+        lastTime = now;
+
+        const dot = document.createElement("div");
+        dot.className = "cursor-dot";
+        dot.style.left = e.clientX + "px";
+        dot.style.top = e.clientY + "px";
+        document.body.appendChild(dot);
+
+        setTimeout(() => {
+          dot.remove();
+        }, 600);
+      });
+    })();
+
+    // ===== Clock (bottom left) =====
+    function updateClock() {
+      const now = new Date();
+      const timeEl = document.getElementById("clock-time");
+      const dateEl = document.getElementById("clock-date");
+
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const ss = String(now.getSeconds()).padStart(2, "0");
+
+      timeEl.textContent = `${hh}:${mm}:${ss}`;
+
+      const dateFormatter = new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      });
+      dateEl.textContent = dateFormatter.format(now);
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // ===== RoMonitor integration (placeholder) =====
+    // NOTE:
+    // Replace ROMONITOR_* URLs with the real endpoints you use.
+    // This is wired so that:
+    //  - We always show FULL numbers (no abbreviation)
+    //  - We poll periodically to mirror RoMonitor updates
+
+    const POLL_INTERVAL_MS = 60_000; // 60s; adjust if you want it spicier
+
+    const ROMONITOR_GLOBAL_URL = "https://your-romonitor-endpoint.example/global";
+    const ROMONITOR_TRENDS_URL = "https://your-romonitor-endpoint.example/trends";
+    const ROMONITOR_TOP_GAMES_URL = "https://your-romonitor-endpoint.example/top-games?limit=50";
+
+    let lastCcu = null;
+
+    function formatFullNumber(n) {
+      // Full integer, but with thin grouping for readability
+      if (typeof n !== "number") return String(n);
+      return n.toLocaleString(undefined, {
+        maximumFractionDigits: 0,
+        useGrouping: true,
+      });
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }
+
+    async function updateGlobalStats() {
+      const ccuEl = document.getElementById("global-ccu");
+      const lastUpdatedEl = document.getElementById("last-updated");
+      const changeEl = document.getElementById("ccu-change");
+      const trendLabelEl = document.getElementById("ccu-trend-label");
+
+      try {
+        // EXPECTED SHAPE (example):
+        // {
+        //   "concurrent": 18234567,
+        //   "timestamp": "2026-03-01T23:59:00Z"
+        // }
+        const data = await fetchJson(ROMONITOR_GLOBAL_URL);
+        const ccu = Number(data.concurrent ?? 0);
+
+        ccuEl.textContent = formatFullNumber(ccu);
+
+        const ts = data.timestamp ? new Date(data.timestamp) : new Date();
+        const tsFmt = new Intl.DateTimeFormat(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+        }).format(ts);
+        lastUpdatedEl.textContent = "RoMonitor · " + tsFmt;
+
+        if (lastCcu !== null) {
+          const delta = ccu - lastCcu;
+          const sign = delta > 0 ? "+" : delta < 0 ? "−" : "±";
+          const absDelta = Math.abs(delta);
+          changeEl.textContent = `Δ ${sign}${formatFullNumber(absDelta)} since last poll`;
+
+          if (delta < 0) {
+            trendLabelEl.textContent = "Downward trend detected";
+          } else if (delta > 0) {
+            trendLabelEl.textContent = "Short‑term recovery blip";
+          } else {
+            trendLabelEl.textContent = "Flatline · holding pattern";
+          }
+        }
+
+        lastCcu = ccu;
+      } catch (err) {
+        console.error("Failed to update global stats", err);
+        lastUpdatedEl.textContent = "RoMonitor unreachable · retrying…";
+      }
+    }
+
+    async function updateTrends() {
+      const listEl = document.getElementById("trends-list");
+      if (!listEl) return;
+
+      try {
+        // EXPECTED SHAPE (example):
+        // [
+        //   { "tag": "#AIAGE", "label": "AI Age Estimation", "delta": -3.2, "volume": 12450 },
+        //   ...
+        // ]
+        const data = await fetchJson(ROMONITOR_TRENDS_URL);
+
+        listEl.innerHTML = "";
+        (data || []).forEach((trend) => {
+          const item = document.createElement("div");
+          item.className = "trend-item";
+
+          const left = document.createElement("div");
+          left.className = "trend-left";
+
+          const tag = document.createElement("div");
+          tag.className = "trend-tag";
+          tag.textContent = trend.tag || "#TREND";
+
+          const label = document.createElement("div");
+          label.className = "trend-label";
+          label.textContent = trend.label || "Unknown trend";
+
+          left.appendChild(tag);
+          left.appendChild(label);
+
+          const right = document.createElement("div");
+          right.className = "trend-meta";
+
+          const vol = document.createElement("div");
+          vol.textContent = `Volume: ${formatFullNumber(trend.volume ?? 0)}`;
+
+          const delta = document.createElement("div");
+          const d = Number(trend.delta ?? 0);
+          const sign = d > 0 ? "+" : d < 0 ? "−" : "±";
+          delta.textContent = `Δ ${sign}${Math.abs(d).toFixed(1)}%`;
+
+          right.appendChild(vol);
+          right.appendChild(delta);
+
+          item.appendChild(left);
+          item.appendChild(right);
+          listEl.appendChild(item);
+        });
+
+        if (!data || !data.length) {
+          const empty = document.createElement("div");
+          empty.className = "trend-item";
+          empty.textContent = "No trend data available.";
+          listEl.appendChild(empty);
+        }
+      } catch (err) {
+        console.error("Failed to update trends", err);
+        listEl.innerHTML = "";
+        const error = document.createElement("div");
+        error.className = "trend-item";
+        error.textContent = "Error loading trends from RoMonitor.";
+        listEl.appendChild(error);
+      }
+    }
+
+    async function updateTopGames() {
+      const listEl = document.getElementById("games-list");
+      if (!listEl) return;
+
+      try {
+        // EXPECTED SHAPE (example):
+        // [
+        //   {
+        //     "rank": 1,
+        //     "name": "Blox Fruits",
+        //     "ccu": 456789,
+        //     "genre": "Adventure"
+        //   },
+        //   ...
+        // ]
+        const data = await fetchJson(ROMONITOR_TOP_GAMES_URL);
+
+        listEl.innerHTML = "";
+        (data || []).forEach((game) => {
+          const item = document.createElement("div");
+          item.className = "game-item";
+
+          const left = document.createElement("div");
+          left.className = "game-left";
+
+          const rank = document.createElement("div");
+          rank.className = "game-rank";
+          rank.textContent = "#" + (game.rank ?? "?");
+
+          const name = document.createElement("div");
+          name.className = "game-name";
+          name.textContent = game.name || "Unknown experience";
+
+          left.appendChild(rank);
+          left.appendChild(name);
+
+          const right = document.createElement("div");
+          right.className = "game-meta";
+
+          const ccu = document.createElement("div");
+          ccu.className = "game-ccu";
+          ccu.textContent = formatFullNumber(game.ccu ?? 0) + " playing";
+
+          const genre = document.createElement("div");
+          genre.className = "game-genre";
+          genre.textContent = game.genre || "Unclassified";
+
+          right.appendChild(ccu);
+          right.appendChild(genre);
+
+          item.appendChild(left);
+          item.appendChild(right);
+          listEl.appendChild(item);
+        });
+
+        if (!data || !data.length) {
+          const empty = document.createElement("div");
+          empty.className = "game-item";
+          empty.textContent = "No top‑game data available.";
+          listEl.appendChild(empty);
+        }
+      } catch (err) {
+        console.error("Failed to update top games", err);
+        listEl.innerHTML = "";
+        const error = document.createElement("div");
+        error.className = "game-item";
+        error.textContent = "Error loading top games from RoMonitor.";
+        listEl.appendChild(error);
+      }
+    }
+
+    function pollAll() {
+      updateGlobalStats();
+      updateTrends();
+      updateTopGames();
+    }
+
+    pollAll();
+    setInterval(pollAll, POLL_INTERVAL_MS);
+  </script>
+</body>
+</html>
